@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using Unity.Properties;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -9,6 +11,7 @@ public class DrawingCanvas : MonoBehaviour
 {
     Vector3 center;
     Vector3 mousePos;
+    float[,] pixels;
 
     [SerializeField] int dimension;
     [SerializeField] Sprite pixel;
@@ -17,6 +20,8 @@ public class DrawingCanvas : MonoBehaviour
     [SerializeField] Camera camera;
     [SerializeField] Slider radiusSlider;
     [SerializeField] Slider strengthSlider;
+    [SerializeField] float innerRadius;
+    [SerializeField] Dropdown cifra;
 
     [Header("Crtanje")]
 
@@ -27,6 +32,9 @@ public class DrawingCanvas : MonoBehaviour
     {
         center = pivot.position;
         CreateCanvas();
+        ReadRadius();
+        ReadStrength();
+        pixels = new float[dimension, dimension];
     }
 
     [ContextMenu("Create canvas")]
@@ -69,11 +77,10 @@ public class DrawingCanvas : MonoBehaviour
     {
         if (Input.GetMouseButton(0))
         {
-            if(mousePos != Input.mousePosition)
+            if(Vector3.Distance(mousePos, camera.ScreenToWorldPoint(Input.mousePosition)) > innerRadius)
             {
                 Paint();
-                mousePos = Input.mousePosition;
-                Debug.Log("a");
+                mousePos = camera.ScreenToWorldPoint(Input.mousePosition);
             }
         }
         if (Input.GetMouseButtonUp(0))
@@ -95,8 +102,6 @@ public class DrawingCanvas : MonoBehaviour
                 float gray = Strength(distance);
                 Color color = new Color(gray, gray, gray, 0);
                 current.GetComponent<SpriteRenderer>().color -= new Color(gray, gray, gray, 0);
-                //Debug.Log($"{distance}, {gray}");
-                //Debug.Log($"{current.GetComponent<SpriteRenderer>().color} - {color}");
             }
         }
     }
@@ -110,6 +115,46 @@ public class DrawingCanvas : MonoBehaviour
                 transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color = Color.white;
             }
         }
+    }
+
+    public void Save()
+    {
+        //Creating digits folders
+        for (int i = 0; i < cifra.options.Count; i++)
+        {
+            if (!Directory.Exists($"{Application.persistentDataPath}/{cifra.options[i]}")) Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, cifra.options[i].text));
+        }
+
+        //Creating file
+        int fileName = 0;
+        while (true)
+        {
+            if (!File.Exists($"{Application.persistentDataPath}/{cifra.value}/{fileName}.txt")) break;
+            fileName++;
+        }
+
+        // Creating data
+        //string path = $"{Application.persistentDataPath}/{cifra.options[cifra.value]}/{fileName}.txt";
+        string path = Path.Combine(Application.persistentDataPath, cifra.options[cifra.value].text, $"{fileName}.txt");
+        StreamWriter streamWriter = new StreamWriter(path);
+        string data = "";
+
+        //Storing data
+        for (int i = 0; i < dimension; i++)
+        {
+            for (int j = 0; j < dimension; j++)
+            {
+                data = data + transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color.r.ToString("F3", CultureInfo.InvariantCulture) + " ";
+            }
+            data += "\n";
+        }
+        streamWriter.Write(data);
+        streamWriter.Close();
+    }
+
+    public void Load()
+    {
+        Application.OpenURL($"{Application.persistentDataPath}");
     }
 
     public void ReadRadius()
