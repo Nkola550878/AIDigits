@@ -11,7 +11,7 @@ public class DrawingCanvas : MonoBehaviour
 {
     Vector3 center;
     Vector3 mousePos;
-    float[,] pixels;
+    [SerializeField] float[,] pixels;
 
     [SerializeField] int dimension;
     [SerializeField] Sprite pixel;
@@ -22,6 +22,7 @@ public class DrawingCanvas : MonoBehaviour
     [SerializeField] Slider strengthSlider;
     [SerializeField] float innerRadius;
     [SerializeField] Dropdown cifra;
+    [SerializeField] Text text;
 
     [Header("Crtanje")]
 
@@ -129,13 +130,14 @@ public class DrawingCanvas : MonoBehaviour
         int fileName = 0;
         while (true)
         {
-            if (!File.Exists($"{Application.persistentDataPath}/{cifra.value}/{fileName}.txt")) break;
+            if (!File.Exists($"{Application.persistentDataPath}/{cifra.options[cifra.value].text}/{fileName}.txt")) break;
             fileName++;
         }
 
         // Creating data
         //string path = $"{Application.persistentDataPath}/{cifra.options[cifra.value]}/{fileName}.txt";
         string path = Path.Combine(Application.persistentDataPath, cifra.options[cifra.value].text, $"{fileName}.txt");
+        Debug.Log(path);
         StreamWriter streamWriter = new StreamWriter(path);
         string data = "";
 
@@ -154,7 +156,26 @@ public class DrawingCanvas : MonoBehaviour
 
     public void Load()
     {
-        Application.OpenURL($"{Application.persistentDataPath}");
+        //HideChildren();
+        pixels = FindObjectOfType<FileManager>().LoadFile($"{text.text}");
+        if(pixels == null)
+        {
+            Clear();
+            return;
+        }
+        LoadPicture();
+        //ShowChildren();
+    }
+
+    public void LoadPicture()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            for (int j = 0; j < transform.GetChild(i).childCount; j++)
+            {
+                transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color = new Color(pixels[i, j], pixels[i, j], pixels[i, j]);
+            }
+        }
     }
 
     public void ReadRadius()
@@ -165,5 +186,20 @@ public class DrawingCanvas : MonoBehaviour
     public void ReadStrength()
     {
         strength = strengthSlider.value;
+    }
+
+    void HideChildren()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            transform.GetChild(i).gameObject.SetActive(false);
+        }
+    }
+    void ShowChildren()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            transform.GetChild(i).gameObject.SetActive(true);
+        }
     }
 }
