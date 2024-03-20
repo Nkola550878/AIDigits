@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using Unity.Properties;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -11,21 +12,24 @@ public class DrawingCanvas : MonoBehaviour
 {
     Vector3 center;
     Vector3 mousePos;
-    [SerializeField] float[,] pixels;
+    float[,] pixels;
+    int dimension = 32;
 
-    [SerializeField] int dimension;
+    [Header("References")]
+
     [SerializeField] Sprite pixel;
-    [SerializeField] float scale;
     [SerializeField] Transform pivot;
     [SerializeField] Camera camera;
     [SerializeField] Slider radiusSlider;
     [SerializeField] Slider strengthSlider;
-    [SerializeField] float innerRadius;
-    [SerializeField] Dropdown cifra;
+    [SerializeField] Dropdown digit;
     [SerializeField] Text text;
+    [SerializeField] Text loadedFromRandom;
 
     [Header("Crtanje")]
 
+    [SerializeField] float innerRadius;
+    [SerializeField] float scale;
     [SerializeField] float radius = 2;
     [SerializeField] float strength = 1f;
 
@@ -41,6 +45,7 @@ public class DrawingCanvas : MonoBehaviour
     [ContextMenu("Create canvas")]
     void CreateCanvas()
     {
+        center = pivot.position;
         int numberOfChildren = transform.childCount;
         while (numberOfChildren > 0)
         {
@@ -103,6 +108,8 @@ public class DrawingCanvas : MonoBehaviour
                 float gray = Strength(distance);
                 Color color = new Color(gray, gray, gray, 0);
                 current.GetComponent<SpriteRenderer>().color -= new Color(gray, gray, gray, 0);
+                pixels[i, j] = current.GetComponent<SpriteRenderer>().color.r;
+                //Debug.Log(pixels[i, j]);
             }
         }
     }
@@ -120,44 +127,18 @@ public class DrawingCanvas : MonoBehaviour
 
     public void Save()
     {
-        //Creating digits folders
-        for (int i = 0; i < cifra.options.Count; i++)
-        {
-            if (!Directory.Exists($"{Application.persistentDataPath}/{cifra.options[i]}")) Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, cifra.options[i].text));
-        }
-
-        //Creating file
-        int fileName = 0;
-        while (true)
-        {
-            if (!File.Exists($"{Application.persistentDataPath}/{cifra.options[cifra.value].text}/{fileName}.txt")) break;
-            fileName++;
-        }
-
-        // Creating data
-        //string path = $"{Application.persistentDataPath}/{cifra.options[cifra.value]}/{fileName}.txt";
-        string path = Path.Combine(Application.persistentDataPath, cifra.options[cifra.value].text, $"{fileName}.txt");
-        Debug.Log(path);
-        StreamWriter streamWriter = new StreamWriter(path);
-        string data = "";
-
-        //Storing data
-        for (int i = 0; i < dimension; i++)
-        {
-            for (int j = 0; j < dimension; j++)
-            {
-                data = data + transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color.r.ToString("F3", CultureInfo.InvariantCulture) + " ";
-            }
-            data += "\n";
-        }
-        streamWriter.Write(data);
-        streamWriter.Close();
+        FindObjectOfType<FileManager>().Save(pixels, digit);
     }
 
-    public void Load()
+    public void ButtonLoad()
+    {
+        Load(text.text);
+    }
+
+    void Load(string path)
     {
         //HideChildren();
-        pixels = FindObjectOfType<FileManager>().LoadFile($"{text.text}");
+        pixels = FindObjectOfType<FileManager>().LoadFile(path);
         if(pixels == null)
         {
             Clear();
@@ -167,7 +148,7 @@ public class DrawingCanvas : MonoBehaviour
         //ShowChildren();
     }
 
-    public void LoadPicture()
+    void LoadPicture()
     {
         for (int i = 0; i < transform.childCount; i++)
         {
@@ -176,6 +157,27 @@ public class DrawingCanvas : MonoBehaviour
                 transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color = new Color(pixels[i, j], pixels[i, j], pixels[i, j]);
             }
         }
+    }
+
+    public void LoadRandomPicture()
+    {
+        int numberOfDigits = digit.options.Count;
+        bool[] hasFile = new bool[numberOfDigits];
+        int randomNumber;
+        string lookingAtDigit;
+        do
+        {
+            randomNumber = Random.Range(0, numberOfDigits);
+            lookingAtDigit = digit.options[randomNumber].text;
+            hasFile[randomNumber] = true;
+
+        } while (Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length == 0 && hasFile.Any(c => c == false));
+
+        int numberOfExamples = Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length;
+        randomNumber = Random.Range(0, numberOfExamples);
+        Debug.Log($"{lookingAtDigit}/{randomNumber}.txt");
+        Load($"{lookingAtDigit}/{randomNumber}.txt");
+        loadedFromRandom.text = lookingAtDigit;
     }
 
     public void ReadRadius()
@@ -202,4 +204,5 @@ public class DrawingCanvas : MonoBehaviour
             transform.GetChild(i).gameObject.SetActive(true);
         }
     }
+
 }
