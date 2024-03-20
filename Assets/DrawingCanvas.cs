@@ -109,7 +109,6 @@ public class DrawingCanvas : MonoBehaviour
                 Color color = new Color(gray, gray, gray, 0);
                 current.GetComponent<SpriteRenderer>().color -= new Color(gray, gray, gray, 0);
                 pixels[i, j] = current.GetComponent<SpriteRenderer>().color.r;
-                //Debug.Log(pixels[i, j]);
             }
         }
     }
@@ -123,6 +122,7 @@ public class DrawingCanvas : MonoBehaviour
                 transform.GetChild(i).GetChild(j).gameObject.GetComponent<SpriteRenderer>().color = Color.white;
             }
         }
+        loadedFromRandom.text = "";
     }
 
     public void Save()
@@ -145,6 +145,7 @@ public class DrawingCanvas : MonoBehaviour
             return;
         }
         LoadPicture();
+        loadedFromRandom.text = "";
         //ShowChildren();
     }
 
@@ -175,7 +176,7 @@ public class DrawingCanvas : MonoBehaviour
 
         int numberOfExamples = Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length;
         randomNumber = Random.Range(0, numberOfExamples);
-        Debug.Log($"{lookingAtDigit}/{randomNumber}.txt");
+        //Debug.Log($"{lookingAtDigit}/{randomNumber}.txt");
         Load($"{lookingAtDigit}/{randomNumber}.txt");
         loadedFromRandom.text = lookingAtDigit;
     }
