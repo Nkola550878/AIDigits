@@ -99,14 +99,18 @@ public class DrawingCanvas : MonoBehaviour
     void Paint()
     {
         Vector2 mousePosition = new Vector2(camera.ScreenToWorldPoint(Input.mousePosition).x, camera.ScreenToWorldPoint(Input.mousePosition).y);
+        GameObject current;
+        float distance;
+        float gray;
+        Color color;
         for (int i = 0; i < transform.childCount; i++)
         {
             for (int j = 0; j < transform.GetChild(i).childCount; j++)
             {
-                GameObject current = transform.GetChild(i).GetChild(j).gameObject;
-                float distance = Vector2.Distance(current.transform.position, mousePosition);
-                float gray = Strength(distance);
-                Color color = new Color(gray, gray, gray, 0);
+                current = transform.GetChild(i).GetChild(j).gameObject;
+                distance = Vector2.Distance(current.transform.position, mousePosition);
+                gray = Strength(distance);
+                color = new Color(gray, gray, gray, 0);
                 current.GetComponent<SpriteRenderer>().color -= new Color(gray, gray, gray, 0);
                 pixels[i, j] = current.GetComponent<SpriteRenderer>().color.r;
             }
@@ -127,7 +131,37 @@ public class DrawingCanvas : MonoBehaviour
 
     public void Save()
     {
-        FindObjectOfType<FileManager>().Save(pixels, digit);
+        //Creating digits folders
+        for (int i = 0; i < digit.options.Count; i++)
+        {
+            if (!Directory.Exists($"{Application.persistentDataPath}/{digit.options[i]}"))
+                Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, digit.options[i].text));
+        }
+
+        //Creating file
+        int fileName = 0;
+        while (true)
+        {
+            if (!File.Exists($"{Application.persistentDataPath}/{digit.options[digit.value].text}/{fileName}.txt")) break;
+            fileName++;
+        }
+
+        // Creating data
+        int dimension = pixels.GetLength(0);
+        string path = Path.Combine($"{digit.options[digit.value].text}/{fileName}.txt");
+        string data = "";
+
+        //Storing data
+        for (int i = 0; i < dimension; i++)
+        {
+            for (int j = 0; j < dimension; j++)
+            {
+                data = data + pixels[i, j].ToString("F3", CultureInfo.InvariantCulture) + " ";
+            }
+            data += "\n";
+        }
+
+        FindObjectOfType<FileManager>().Save(data, digit, path);
     }
 
     public void ButtonLoad()
@@ -138,7 +172,7 @@ public class DrawingCanvas : MonoBehaviour
     void Load(string path)
     {
         //HideChildren();
-        pixels = FindObjectOfType<FileManager>().LoadFile(path);
+        pixels = ReadFile(FindObjectOfType<FileManager>().LoadFile(path));
         if(pixels == null)
         {
             Clear();
@@ -147,6 +181,22 @@ public class DrawingCanvas : MonoBehaviour
         LoadPicture();
         loadedFromRandom.text = "";
         //ShowChildren();
+    }
+
+    float[,] ReadFile(string data)
+    {
+        if (data == null) return new float[dimension, dimension];
+        string[] columns = data.Substring(0, data.Length - 1).Split("\n");
+        float[,] pixels = new float[columns.Length, columns.Length];
+        for (int i = 0; i < columns.Length; i++)
+        {
+            string[] currentColumn = columns[i].Substring(0, columns[i].Length - 1).Split(" ");
+            for (int j = 0; j < currentColumn.Length; j++)
+            {
+                pixels[i, j] = float.Parse(currentColumn[j]);
+            }
+        }
+        return pixels;
     }
 
     void LoadPicture()
@@ -205,5 +255,4 @@ public class DrawingCanvas : MonoBehaviour
             transform.GetChild(i).gameObject.SetActive(true);
         }
     }
-
 }

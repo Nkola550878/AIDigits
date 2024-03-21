@@ -39,70 +39,28 @@ public class FileManager : MonoBehaviour
 
     //}
 
-    public float[,] LoadFile(string s)
+    public string LoadFile(string s)
     {
-        //Debug.Log(Application.persistentDataPath);
-
         string[] path = s.Split("/");
         string fullPath = Application.persistentDataPath;
 
         for (int i = 0; i < path.Length; i++)
         {
-            //Debug.Log(Path.Combine(fullPath, path[i]));
             fullPath = Path.Combine(fullPath, path[i]);
         }
 
-        if(!File.Exists(fullPath))
+        if (!File.Exists(fullPath))
             return null;
-        StreamReader streamReader = new StreamReader(fullPath);
 
+        StreamReader streamReader = new StreamReader(fullPath);
         string data = streamReader.ReadToEnd();
-        string[] columns = data.Substring(0, data.Length - 1).Split("\n");
-        float[,] pixels = new float[columns.Length,columns.Length];
-        for (int i = 0; i < columns.Length; i++)
-        {
-            //Debug.Log($"i={i}");
-            string[] currentColumn = columns[i].Substring(0, columns[i].Length - 1).Split(" ");
-            for (int j = 0; j < currentColumn.Length; j++)
-            {
-                pixels[i, j] = float.Parse(currentColumn[j]);
-            }
-        }
-        return pixels;
+        return data;
     }
 
-    public void Save(float[,] pixels, Dropdown digit)
+    public void Save(string data, Dropdown digit, string fileName)
     {
-        //Creating digits folders
-        for (int i = 0; i < digit.options.Count; i++)
-        {
-            if (!Directory.Exists($"{Application.persistentDataPath}/{digit.options[i]}"))
-                Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, digit.options[i].text));
-        }
-
-        //Creating file
-        int fileName = 0;
-        while (true)
-        {
-            if (!File.Exists($"{Application.persistentDataPath}/{digit.options[digit.value].text}/{fileName}.txt")) break;
-            fileName++;
-        }
-
-        // Creating data
-        int dimension = pixels.GetLength(0);
-        string path = Path.Combine(Application.persistentDataPath, digit.options[digit.value].text, $"{fileName}.txt");
+        string path = Path.Combine(Application.persistentDataPath, fileName);
         StreamWriter streamWriter = new StreamWriter(path);
-        string data = "";
-
-        //Storing data
-        for (int i = 0; i < dimension; i++)
-        {
-            for (int j = 0; j < dimension; j++)
-            {
-                data = data + pixels[i, j].ToString("F3", CultureInfo.InvariantCulture) + " ";
-            }
-            data += "\n";
-        }
         streamWriter.Write(data);
         streamWriter.Close();
     }
