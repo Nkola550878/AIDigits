@@ -11,33 +11,10 @@ public class FileManager : MonoBehaviour
 {
     [SerializeField] Transform panel;
 
-    //public void CreateFileExplorer(string startFolder)
-    //{
-    //    for (int i = 0; i < panel.childCount; i++)
-    //    {
-    //        Destroy(panel.GetChild(i));
-    //    }
-
-    //    string[] directories = Directory.GetDirectories(startFolder);
-    //    Debug.Log(directories.Length);
-    //    for (int i = 0; i < directories.Length; i++)
-    //    {
-    //        GameObject temp = Instantiate(button, panel.localPosition + new Vector3(0, i * button.GetComponent<RectTransform>().localScale.y), Quaternion.identity, panel);
-    //        temp.GetComponentInChildren<Text>().text = Path.GetFileName(directories[i]);
-    //        temp.GetComponent<Button>().onClick.AddListener(() => CreateFileExplorer($"{startFolder}/{directories[i]}"));
-    //    }
-
-    //    string[] files = Directory.GetFiles(startFolder);
-    //    Debug.Log(directories.Length);
-    //    for (int i = 0; i < files.Length; i++)
-    //    {
-    //        GameObject temp = Instantiate(button, panel.position + new Vector3(0, i * button.GetComponent<RectTransform>().localScale.y), Quaternion.identity, panel);
-    //        temp.GetComponentInChildren<Text>().text = Path.GetFileName(files[i]);
-    //        temp.GetComponent<Button>().onClick.AddListener(() => LoadFile($"{startFolder}/{files[i]}"));
-    //    }
-
-
-    //}
+    private void Start()
+    {
+        //DontDestroyOnLoad(this);
+    }
 
     public string LoadFile(string s)
     {
@@ -54,13 +31,23 @@ public class FileManager : MonoBehaviour
 
         StreamReader streamReader = new StreamReader(fullPath);
         string data = streamReader.ReadToEnd();
+        streamReader.Close();
         return data;
     }
 
-    public void Save(string data, Dropdown digit, string fileName)
+    public void Save(string data, string fileName)
     {
         string path = Path.Combine(Application.persistentDataPath, fileName);
         StreamWriter streamWriter = new StreamWriter(path);
+        streamWriter.Write(data);
+        streamWriter.Close();
+    }
+
+    public void Append(string data, string fileName)
+    {
+        string path = Path.Combine(Application.persistentDataPath, fileName);
+        StreamWriter streamWriter = new StreamWriter(path, true);
+        data = $"\n{data}";
         streamWriter.Write(data);
         streamWriter.Close();
     }

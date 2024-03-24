@@ -161,7 +161,7 @@ public class DrawingCanvas : MonoBehaviour
             data += "\n";
         }
 
-        FindObjectOfType<FileManager>().Save(data, digit, path);
+        FindObjectOfType<FileManager>().Save(data, path);
     }
 
     public void ButtonLoad()
@@ -226,7 +226,6 @@ public class DrawingCanvas : MonoBehaviour
 
         int numberOfExamples = Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length;
         randomNumber = Random.Range(0, numberOfExamples);
-        //Debug.Log($"{lookingAtDigit}/{randomNumber}.txt");
         Load($"{lookingAtDigit}/{randomNumber}.txt");
         loadedFromRandom.text = lookingAtDigit;
     }
