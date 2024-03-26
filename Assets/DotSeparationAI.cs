@@ -32,7 +32,8 @@ public class DotSeparationAI : MonoBehaviour
         transform.localScale = new Vector3(Mathf.Abs(Position00.position.x - Position22.position.x), Mathf.Abs(Position00.position.y - Position22.position.y), 1);
         //AddDots(500);
         //Layer layer = new Layer();
-        AI.Guess();
+        AI = new Network();
+        Debug.Log(AI.Guess(dots[0].x, dots[0].y));
     }
 
     void AddDots(int number)
@@ -123,7 +124,7 @@ public class DotSeparationAI : MonoBehaviour
 
 internal class Dot
 {
-    float x, y;
+    public float x, y;
     int index;
 
     public Dot(float l_x, float l_y, int l_index)
@@ -148,7 +149,9 @@ internal class Layer
 
     public Layer(int numberOfInputNodes, int numberOfOutputNodes)
     {
+        inputNodes = new float[numberOfInputNodes];
         conections = new float[numberOfOutputNodes, numberOfInputNodes];
+        outputNodes = new float[numberOfOutputNodes];
         FillConnections();
     }
 
@@ -159,7 +162,7 @@ internal class Layer
             for (int j = 0; j < conections.GetLength(1); j++)
             {
                 conections[i, j] = UnityEngine.Random.value;
-                Debug.Log(conections[i, j]);
+                //Debug.Log(conections[i, j]);
             }
         }
     }
@@ -179,13 +182,16 @@ internal class Network
         }
     }
 
-    public int Guess()
+    public int Guess(float x, float y)
     {
+        layers[0].inputNodes[0] = x;
+        layers[0].inputNodes[1] = y;
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
-            layers[i + 1].inputNodes = Network.Multiply(layers[i].inputNodes, layers[i].conections);
+            layers[i].outputNodes = Multiply(layers[i].inputNodes, layers[i].conections);
+            if (i + 2 != numberOfNodesPerLayer.Length) layers[i + 1].inputNodes = layers[i].outputNodes;
         }
-        return Array.IndexOf(layers[numberOfNodesPerLayer.Length - 1].outputNodes, layers[numberOfNodesPerLayer.Length - 1].outputNodes.Max());
+        return Array.IndexOf(layers[numberOfNodesPerLayer.Length - 2].outputNodes, layers[numberOfNodesPerLayer.Length - 2].outputNodes.Max());
     }
 
     public static float[] Multiply(float[] vector, float[,] matrix)
@@ -197,7 +203,7 @@ internal class Network
             float currentResult = 0;
             for (int j = 0; j < matrix.GetLength(1); j++)
             {
-                currentResult += matrix[j, i] * vector[j];
+                currentResult += matrix[i, j] * vector[j];
             }
             result[i] = currentResult;
         }
