@@ -33,7 +33,7 @@ public class DotSeparationAI : MonoBehaviour
         //AddDots(500);
         //Layer layer = new Layer();
         AI = new Network();
-        Debug.Log(AI.Guess(dots[0].x, dots[0].y));
+        Debug.Log(AI.Cost(dots[0]));
     }
 
     void AddDots(int number)
@@ -126,6 +126,13 @@ internal class Dot
 {
     public float x, y;
     int index;
+    public int Index
+    {
+        get
+        {
+            return index;
+        }
+    }
 
     public Dot(float l_x, float l_y, int l_index)
     {
@@ -136,7 +143,7 @@ internal class Dot
 
     public override string ToString()
     {
-        return $"{x},{y},{index}";
+        return $"({x},{y},{index})";
     }
 }
 
@@ -145,13 +152,14 @@ internal class Layer
     public float[] inputNodes;
     public float[] outputNodes;
     public float[,] conections;
-    float[] biases;
+    public float[] biases;
 
     public Layer(int numberOfInputNodes, int numberOfOutputNodes)
     {
         inputNodes = new float[numberOfInputNodes];
         conections = new float[numberOfOutputNodes, numberOfInputNodes];
         outputNodes = new float[numberOfOutputNodes];
+        biases = new float[numberOfInputNodes];
         FillConnections();
     }
 
@@ -182,16 +190,40 @@ internal class Network
         }
     }
 
-    public int Guess(float x, float y)
+    public float[] Guess(float x, float y)
     {
         layers[0].inputNodes[0] = x;
         layers[0].inputNodes[1] = y;
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
-            layers[i].outputNodes = Multiply(layers[i].inputNodes, layers[i].conections);
+            for (int j = 0; j < layers[i].biases.Length; j++)
+            {
+                layers[i].outputNodes[j] = Sigmoid(Multiply(layers[i].inputNodes, layers[i].conections)[j] + layers[i].biases[j]);
+            }
             if (i + 2 != numberOfNodesPerLayer.Length) layers[i + 1].inputNodes = layers[i].outputNodes;
         }
-        return Array.IndexOf(layers[numberOfNodesPerLayer.Length - 2].outputNodes, layers[numberOfNodesPerLayer.Length - 2].outputNodes.Max());
+        return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
+    }
+
+    public float[] Guess(Dot dot)
+    {
+        return Guess(dot.x, dot.y);
+    }
+
+    public float Cost(Dot dot)
+    {
+        float[] guess = Guess(dot);
+        float cost = 0;
+        for (int i = 0; i < guess.Length; i++)
+        {
+            if (i == dot.Index)
+            {
+                cost += (float)Math.Pow((1 - guess[i]), 2);
+                continue;
+            }
+            cost += (float)Math.Pow(guess[i], 2);
+        }
+        return cost;
     }
 
     public static float[] Multiply(float[] vector, float[,] matrix)
@@ -208,5 +240,10 @@ internal class Network
             result[i] = currentResult;
         }
         return result;
+    }
+
+    public static float Sigmoid(float input)
+    {
+        return (float)(1 / (1 + Math.Pow(Math.E, -input)));
     }
 }
