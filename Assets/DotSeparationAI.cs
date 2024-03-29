@@ -25,15 +25,19 @@ public class DotSeparationAI : MonoBehaviour
     [SerializeField] InputField inputValue;
     [SerializeField] GameObject circleSprite;
 
+    [Header("AI")]
+
+    [SerializeField] float[] wantedChanges;
+
     void Start()
     {
         dots = FormatFromFile(FindObjectOfType<FileManager>().LoadFile(fileLocation));
         transform.position = (Position00.position + Position22.position) / 2;
         transform.localScale = new Vector3(Mathf.Abs(Position00.position.x - Position22.position.x), Mathf.Abs(Position00.position.y - Position22.position.y), 1);
-        //AddDots(500);
-        //Layer layer = new Layer();
         AI = new Network();
         Debug.Log(AI.Cost(dots[0]));
+        Debug.Log(dots[0].Index);
+        wantedChanges = AI.WantedChanges(dots[0].Index);
     }
 
     void AddDots(int number)
@@ -115,11 +119,6 @@ public class DotSeparationAI : MonoBehaviour
         temp.transform.position = new Vector2(newX, newY);
         temp.GetComponent<SpriteRenderer>().color = new Color(index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0);
     }
-
-    void Update()
-    {
-        
-    }
 }
 
 internal class Dot
@@ -159,7 +158,7 @@ internal class Layer
         inputNodes = new float[numberOfInputNodes];
         conections = new float[numberOfOutputNodes, numberOfInputNodes];
         outputNodes = new float[numberOfOutputNodes];
-        biases = new float[numberOfInputNodes];
+        biases = new float[numberOfOutputNodes];
         FillConnections();
     }
 
@@ -170,7 +169,6 @@ internal class Layer
             for (int j = 0; j < conections.GetLength(1); j++)
             {
                 conections[i, j] = UnityEngine.Random.value;
-                //Debug.Log(conections[i, j]);
             }
         }
     }
@@ -196,11 +194,8 @@ internal class Network
         layers[0].inputNodes[1] = y;
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
-            for (int j = 0; j < layers[i].biases.Length; j++)
-            {
-                layers[i].outputNodes[j] = Sigmoid(Multiply(layers[i].inputNodes, layers[i].conections)[j] + layers[i].biases[j]);
-            }
-            if (i + 2 != numberOfNodesPerLayer.Length) layers[i + 1].inputNodes = layers[i].outputNodes;
+            layers[i].outputNodes = MatrixOperations.Sigmoid(MatrixOperations.Add(MatrixOperations.Multiply(layers[i].inputNodes, layers[i].conections), layers[i].biases));
+            if (i != numberOfNodesPerLayer.Length - 2) layers[i + 1].inputNodes = layers[i].outputNodes;
         }
         return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
     }
@@ -226,6 +221,16 @@ internal class Network
         return cost;
     }
 
+    public float[] WantedChanges(int indexOfCorrect)
+    {
+        float[] wantedChanges = new float[numberOfNodesPerLayer[numberOfNodesPerLayer.Length - 1]];
+        wantedChanges[indexOfCorrect] = 1 - layers[numberOfNodesPerLayer.Length - 2].outputNodes[indexOfCorrect];
+        return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
+    }
+}
+
+public class MatrixOperations
+{
     public static float[] Multiply(float[] vector, float[,] matrix)
     {
         if (matrix.GetLength(1) != vector.Length) return null;
@@ -238,6 +243,32 @@ internal class Network
                 currentResult += matrix[i, j] * vector[j];
             }
             result[i] = currentResult;
+        }
+        return result;
+    }
+
+    public static float[] Add(float[] v1, float[] v2)
+    {
+        if(v1.Length != v2.Length)
+        {
+            return null;
+        }
+        float[] result = new float[v1.Length];
+
+        for (int i = 0; i < v1.Length; i++)
+        {
+            result[i] = v1[i] + v2[i];
+        }
+        return result;
+    }
+
+    public static float[] Sigmoid(float[] v)
+    {
+        float[] result = new float[v.Length];
+
+        for (int i = 0; i < v.Length; i++)
+        {
+            result[i] = Sigmoid(v[i]);
         }
         return result;
     }
