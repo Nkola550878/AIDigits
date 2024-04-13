@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -14,9 +15,12 @@ public class DotSeparationAI : MonoBehaviour
     List<Dot> dots = new List<Dot>();
     string fileLocation = "dots.csv";
     Network AI;
+    Color[] colors = new Color[] { Color.red, Color.green, Color.blue };
 
     [Header("References")]
 
+    [SerializeField] Camera camera;
+    [SerializeField] SpriteRenderer output;
     [SerializeField] float radius;
     [SerializeField] Transform Position00;
     [SerializeField] Transform Position22;
@@ -38,8 +42,23 @@ public class DotSeparationAI : MonoBehaviour
         Debug.Log(AI.Cost(dots[0]));
         Debug.Log(dots[0].Index);
         wantedChanges = AI.WantedChanges(dots[0].Index);
+        AI.BackPropagation(wantedChanges, AI.layers.Length);
     }
 
+    private void Update()
+    {
+        Vector3 mousePosition = camera.ScreenToWorldPoint(Input.mousePosition);
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (mousePosition.x > Position22.position.x) return;
+            if (mousePosition.x < Position00.position.x) return;
+            if (mousePosition.y > Position22.position.y) return;
+            if (mousePosition.y < Position00.position.y) return;
+            float[] guess = AI.Guess(mousePosition.x, mousePosition.y);
+            int index = Array.IndexOf(guess, guess.Max());
+            output.GetComponent<SpriteRenderer>().color = new Color(index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0);
+        }
+    }
     void AddDots(int number)
     {
         float x;
@@ -153,13 +172,13 @@ internal class Layer
     public float[,] conections;
     public float[] biases;
 
-    public Layer(int numberOfInputNodes, int numberOfOutputNodes)
+    public Layer(int numberOfInputNodes, int numberOfOutputNodes, bool randomize)
     {
         inputNodes = new float[numberOfInputNodes];
         conections = new float[numberOfOutputNodes, numberOfInputNodes];
         outputNodes = new float[numberOfOutputNodes];
         biases = new float[numberOfOutputNodes];
-        FillConnections();
+        if (randomize) FillConnections();
     }
 
     void FillConnections()
@@ -176,15 +195,16 @@ internal class Layer
 
 internal class Network
 {
-    int[] numberOfNodesPerLayer = new int[] { 2, 3 };
-    Layer[] layers;
+    int[] numberOfNodesPerLayer = new int[] { 2, 3, 3 };
+    public Layer[] layers;
+    public Layer[,] wantedChanges;
 
     public Network()
     {
         layers = new Layer[numberOfNodesPerLayer.Length - 1];
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
-            layers[i] = new Layer(numberOfNodesPerLayer[i], numberOfNodesPerLayer[i + 1]);
+            layers[i] = new Layer(numberOfNodesPerLayer[i], numberOfNodesPerLayer[i + 1], true);
         }
     }
 
@@ -221,9 +241,29 @@ internal class Network
         return cost;
     }
 
+    public void BackPropagation(float[] wantedChanges, int layerIndex)
+    {
+        if (layerIndex == 0) return;
+        layerIndex--;
+        Debug.Log($"Broj slojeva: {layers.Length}, index sloja: {layerIndex}");
+        Layer wantedChangesToPreviousLayer = new Layer(layers[layerIndex].inputNodes.Length, layers[layerIndex].outputNodes.Length, false);
+        wantedChangesToPreviousLayer.outputNodes = wantedChanges;
+        for (int i = 0; i < layers[layerIndex].outputNodes.Length; i++)
+        {
+            float dfds = (float)Math.Pow(1 + Mathf.Exp(layers[layerIndex].outputNodes[i]), 2) / Mathf.Exp(layers[layerIndex].outputNodes[i]);
+            wantedChangesToPreviousLayer.biases[i] = wantedChanges[i] * dfds;
+            for (int j = 0; j < layers[layerIndex].inputNodes.Length; j++)
+            {
+                wantedChangesToPreviousLayer.conections[i, j] = wantedChanges[i] * dfds / layers[layerIndex].inputNodes[j];
+                wantedChangesToPreviousLayer.inputNodes[j] += wantedChanges[i] * dfds / layers[layerIndex].conections[i, j];
+            }
+        }
+        BackPropagation(wantedChangesToPreviousLayer.inputNodes, layerIndex);
+    }
+
     public float[] WantedChanges(int indexOfCorrect)
     {
-        float[] wantedChanges = new float[numberOfNodesPerLayer[numberOfNodesPerLayer.Length - 1]];
+        float[] wantedChanges = layers[numberOfNodesPerLayer.Length - 2].outputNodes;
         wantedChanges[indexOfCorrect] = 1 - layers[numberOfNodesPerLayer.Length - 2].outputNodes[indexOfCorrect];
         return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
     }
