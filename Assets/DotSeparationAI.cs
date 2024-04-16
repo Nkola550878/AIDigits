@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
 using UnityEngine.UIElements;
 
@@ -15,7 +16,6 @@ public class DotSeparationAI : MonoBehaviour
     List<Dot> dots = new List<Dot>();
     string fileLocation = "dots.csv";
     Network AI;
-    Color[] colors = new Color[] { Color.red, Color.green, Color.blue };
 
     [Header("References")]
 
@@ -32,17 +32,19 @@ public class DotSeparationAI : MonoBehaviour
     [Header("AI")]
 
     [SerializeField] float[] wantedChanges;
+    [SerializeField] int numberOfExamples = 100;
+    [SerializeField] float learnRate = 0.01f;
 
     void Start()
     {
         dots = FormatFromFile(FindObjectOfType<FileManager>().LoadFile(fileLocation));
         transform.position = (Position00.position + Position22.position) / 2;
         transform.localScale = new Vector3(Mathf.Abs(Position00.position.x - Position22.position.x), Mathf.Abs(Position00.position.y - Position22.position.y), 1);
-        AI = new Network();
-        Debug.Log(AI.Cost(dots[0]));
-        Debug.Log(dots[0].Index);
-        wantedChanges = AI.WantedChanges(dots[0].Index);
-        AI.BackPropagation(wantedChanges, AI.layers.Length);
+        AI = new Network(new int[] { 2, 3, 3 }, numberOfExamples, learnRate);
+        for (int i = 0; i < 3000; i++)
+        {
+            AI.BackPropagation(AI.WantedChanges(dots[i].Index), AI.layers.Length);
+        }
     }
 
     private void Update()
@@ -161,51 +163,30 @@ internal class Dot
 
     public override string ToString()
     {
-        return $"({x},{y},{index})";
-    }
-}
-
-internal class Layer
-{
-    public float[] inputNodes;
-    public float[] outputNodes;
-    public float[,] conections;
-    public float[] biases;
-
-    public Layer(int numberOfInputNodes, int numberOfOutputNodes, bool randomize)
-    {
-        inputNodes = new float[numberOfInputNodes];
-        conections = new float[numberOfOutputNodes, numberOfInputNodes];
-        outputNodes = new float[numberOfOutputNodes];
-        biases = new float[numberOfOutputNodes];
-        if (randomize) FillConnections();
-    }
-
-    void FillConnections()
-    {
-        for (int i = 0; i < conections.GetLength(0); i++)
-        {
-            for (int j = 0; j < conections.GetLength(1); j++)
-            {
-                conections[i, j] = UnityEngine.Random.value;
-            }
-        }
+        return $"{x},{y},{index}";
     }
 }
 
 internal class Network
 {
-    int[] numberOfNodesPerLayer = new int[] { 2, 3, 3 };
+    public int numberOfSavedWantedChanges = 0;
+    int[] numberOfNodesPerLayer;
     public Layer[] layers;
-    public Layer[,] wantedChanges;
+    public Layer[,] wantedChangesForNumberOfExamples;
+    public int numberOfExamples;
+    float learningRate;
 
-    public Network()
+    public Network(int[] l_numberOfNodesPerLayer, int l_numberOfExamples, float l_learningRate)
     {
+        numberOfNodesPerLayer = l_numberOfNodesPerLayer;
         layers = new Layer[numberOfNodesPerLayer.Length - 1];
+        wantedChangesForNumberOfExamples = new Layer[l_numberOfExamples, numberOfNodesPerLayer.Length - 1];
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
             layers[i] = new Layer(numberOfNodesPerLayer[i], numberOfNodesPerLayer[i + 1], true);
         }
+        numberOfExamples = l_numberOfExamples;
+        learningRate = l_learningRate;
     }
 
     public float[] Guess(float x, float y)
@@ -243,29 +224,119 @@ internal class Network
 
     public void BackPropagation(float[] wantedChanges, int layerIndex)
     {
-        if (layerIndex == 0) return;
         layerIndex--;
-        Debug.Log($"Broj slojeva: {layers.Length}, index sloja: {layerIndex}");
         Layer wantedChangesToPreviousLayer = new Layer(layers[layerIndex].inputNodes.Length, layers[layerIndex].outputNodes.Length, false);
         wantedChangesToPreviousLayer.outputNodes = wantedChanges;
         for (int i = 0; i < layers[layerIndex].outputNodes.Length; i++)
         {
-            float dfds = (float)Math.Pow(1 + Mathf.Exp(layers[layerIndex].outputNodes[i]), 2) / Mathf.Exp(layers[layerIndex].outputNodes[i]);
-            wantedChangesToPreviousLayer.biases[i] = wantedChanges[i] * dfds;
+            float dfds = (float)Mathf.Exp(layers[layerIndex].outputNodes[i]) / (float)Math.Pow(1 + Mathf.Exp(layers[layerIndex].outputNodes[i]), 2);
+
+            //wantedChangesToPreviousLayer.biases[i] = wantedChanges[i] * dfds;
+            layers[layerIndex].biases[i] -= wantedChanges[i] * dfds * learningRate;
             for (int j = 0; j < layers[layerIndex].inputNodes.Length; j++)
             {
-                wantedChangesToPreviousLayer.conections[i, j] = wantedChanges[i] * dfds / layers[layerIndex].inputNodes[j];
-                wantedChangesToPreviousLayer.inputNodes[j] += wantedChanges[i] * dfds / layers[layerIndex].conections[i, j];
+                //wantedChangesToPreviousLayer.conections[i, j] = wantedChanges[i] * dfds / layers[layerIndex].inputNodes[j];
+                wantedChangesToPreviousLayer.inputNodes[j] += wantedChanges[i] * dfds * layers[layerIndex].conections[i, j];
+
+                layers[layerIndex].conections[i, j] -= wantedChanges[i] * dfds * layers[layerIndex].inputNodes[j] * learningRate;
             }
         }
-        BackPropagation(wantedChangesToPreviousLayer.inputNodes, layerIndex);
+        if(layerIndex != 0) BackPropagation(wantedChangesToPreviousLayer.inputNodes, layerIndex);
+        //wantedChangesForNumberOfExamples[numberOfSavedWantedChanges, layerIndex] = wantedChangesToPreviousLayer;
+        //if(layerIndex == layers.Length - 1) numberOfSavedWantedChanges = (numberOfSavedWantedChanges + 1) % numberOfExamples;
+        //if(numberOfSavedWantedChanges == 0 && layerIndex == layers.Length - 1)
+        //{
+        //    UpdateAI();
+        //}
     }
 
     public float[] WantedChanges(int indexOfCorrect)
     {
         float[] wantedChanges = layers[numberOfNodesPerLayer.Length - 2].outputNodes;
         wantedChanges[indexOfCorrect] = 1 - layers[numberOfNodesPerLayer.Length - 2].outputNodes[indexOfCorrect];
-        return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
+        return wantedChanges;
+    }
+
+    //private void UpdateAI(float cost)
+    //{
+    //    Vector2Int locationOfMax = new Vector2Int(-2, -2);
+    //    float valueOfMaximum = float.NegativeInfinity;
+    //    Vector2Int temp = new Vector2Int(-2, -2);
+    //    int indexOfCurrentLayer = -1;
+    //    for (int i = 0; i < numberOfExamples; i++)
+    //    {
+    //        valueOfMaximum = float.NegativeInfinity;
+    //        for (int j = 0; j < layers.Length; j++)
+    //        {
+    //            //Debug.Log($"i: {i}, j: {j}");
+    //            temp = LocationOfMaximumInLayer(wantedChangesForNumberOfExamples[i, j]);
+    //            if(valueOfMaximum < Math.Abs(temp.y == -1 ? wantedChangesForNumberOfExamples[i, j].biases[temp.x] : wantedChangesForNumberOfExamples[i, j].conections[temp.x, temp.y]))
+    //            {
+    //                locationOfMax = temp;
+    //                valueOfMaximum = Math.Abs(temp.y == -1 ? wantedChangesForNumberOfExamples[i, j].biases[temp.x] : wantedChangesForNumberOfExamples[i, j].conections[temp.x, temp.y]);
+    //                indexOfCurrentLayer = j;
+    //            }
+    //        }
+
+    //        if (locationOfMax.y == -1)
+    //        {
+    //            layers[indexOfCurrentLayer].biases[locationOfMax.x] -= cost / layers[indexOfCurrentLayer].biases[locationOfMax.x];
+    //            continue;
+    //        }
+    //        //Debug.Log($"locationOfMax: {locationOfMax}, indexOfCorrectLayer: {indexOfCurrentLayer}");
+    //        layers[indexOfCurrentLayer].conections[locationOfMax.x, locationOfMax.y] -= cost / layers[indexOfCurrentLayer].conections[locationOfMax.x, locationOfMax.y];
+    //    }
+    //}
+
+    //private Vector2Int LocationOfMaximumInLayer(Layer layer)
+    //{
+    //    Vector2Int locationOfMax = new Vector2Int(0, 0);
+    //    float max = layer.conections[0, 0];
+    //    for (int i = 0; i < layer.outputNodes.Length; i++)
+    //    {
+    //        if (max < Math.Abs(layer.biases[i]))
+    //        {
+    //            locationOfMax = new Vector2Int(i, -1);
+    //            max = Math.Abs(layer.biases[i]);
+    //        }
+    //        for (int j = 0; j < layer.inputNodes.Length; j++)
+    //        {
+    //            if (max < Math.Abs(layer.conections[i, j]))
+    //            {
+    //                locationOfMax = new Vector2Int(i, j);
+    //                max = Math.Abs(layer.conections[i, j]);
+    //            }
+    //        }
+    //    }
+    //    return locationOfMax;
+    //}
+}
+
+internal class Layer
+{
+    public float[] inputNodes;
+    public float[] outputNodes;
+    public float[,] conections;
+    public float[] biases;
+
+    public Layer(int numberOfInputNodes, int numberOfOutputNodes, bool randomize)
+    {
+        inputNodes = new float[numberOfInputNodes];
+        conections = new float[numberOfOutputNodes, numberOfInputNodes];
+        outputNodes = new float[numberOfOutputNodes];
+        biases = new float[numberOfOutputNodes];
+        if (randomize) FillConnections();
+    }
+
+    void FillConnections()
+    {
+        for (int i = 0; i < conections.GetLength(0); i++)
+        {
+            for (int j = 0; j < conections.GetLength(1); j++)
+            {
+                conections[i, j] = UnityEngine.Random.value;
+            }
+        }
     }
 }
 
