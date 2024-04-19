@@ -297,9 +297,8 @@ MonoBehaviour:
   inputY: {fileID: 1116013963}
   inputValue: {fileID: 2094839992}
   circleSprite: {fileID: 4005122256850821182, guid: d6e4ab3f813cef84c911d7066d374b39, type: 3}
-  wantedChanges: []
-  numberOfExamples: 100
-  learnRate: 0.001
+  learnRate: 0.1
+  numberOfTrainigExamples: 100
 --- !u!1 &347907439
 GameObject:
   m_ObjectHideFlags: 0

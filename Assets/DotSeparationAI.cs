@@ -31,20 +31,37 @@ public class DotSeparationAI : MonoBehaviour
 
     [Header("AI")]
 
-    [SerializeField] float[] wantedChanges;
-    [SerializeField] int numberOfExamples = 100;
-    [SerializeField] float learnRate = 0.01f;
+    //[SerializeField] float[] wantedChanges;
+    //[SerializeField] int numberOfExamples = 100;
+    [SerializeField] double learnRate = 0.01f;
+    [SerializeField] int numberOfTrainigExamples;
 
     void Start()
     {
         dots = FormatFromFile(FindObjectOfType<FileManager>().LoadFile(fileLocation));
         transform.position = (Position00.position + Position22.position) / 2;
         transform.localScale = new Vector3(Mathf.Abs(Position00.position.x - Position22.position.x), Mathf.Abs(Position00.position.y - Position22.position.y), 1);
-        AI = new Network(new int[] { 2, 3, 3 }, numberOfExamples, learnRate);
-        for (int i = 0; i < 3000; i++)
+        AI = new Network(new int[] { 2, 3 }, learnRate);
+
+        double[] wantedChanges = AI.WantedChanges(dots[0]);
+        double[] guess = AI.Guess(dots[0]);
+
+        Debug.Log($"W: {MatrixOperations.ToString(wantedChanges)}");
+        Debug.Log($"G: {MatrixOperations.ToString(AI.Guess(dots[0]))}");
+
+        for (int temp = 0; temp < 1000; temp++)
         {
-            AI.BackPropagation(AI.WantedChanges(dots[i].Index), AI.layers.Length);
+            for (int i = 0; i < numberOfTrainigExamples; i++)
+            {
+                DrawDot(dots[i]);
+                AI.BackPropagation(AI.WantedChanges(dots[i]), AI.layers.Length - 1);
+                //wantedChanges = AI.WantedChanges(dots[i]);
+            }
         }
+
+        wantedChanges = AI.WantedChanges(dots[0]);
+        Debug.Log($"W: {MatrixOperations.ToString(wantedChanges)}");
+        Debug.Log($"G: {MatrixOperations.ToString(AI.Guess(dots[0]))}");
     }
 
     private void Update()
@@ -56,7 +73,9 @@ public class DotSeparationAI : MonoBehaviour
             if (mousePosition.x < Position00.position.x) return;
             if (mousePosition.y > Position22.position.y) return;
             if (mousePosition.y < Position00.position.y) return;
-            float[] guess = AI.Guess(mousePosition.x, mousePosition.y);
+            Vector2 mouseScreenPosition;
+            mouseScreenPosition = (mousePosition - Position00.position) / (Position22.position.x - Position00.position.x) * 2;
+            double[] guess = AI.Guess(mouseScreenPosition.x, mouseScreenPosition.y);
             int index = Array.IndexOf(guess, guess.Max());
             output.GetComponent<SpriteRenderer>().color = new Color(index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0);
         }
@@ -125,7 +144,7 @@ public class DotSeparationAI : MonoBehaviour
             y = float.Parse(brokenLine[1]);
             value = int.Parse(brokenLine[2]);
             result.Add(new Dot(x, y, value));
-            DrawDot(x, y, value);
+            //DrawDot(x, y, value);
         }
         return result;
     }
@@ -140,11 +159,16 @@ public class DotSeparationAI : MonoBehaviour
         temp.transform.position = new Vector2(newX, newY);
         temp.GetComponent<SpriteRenderer>().color = new Color(index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0);
     }
+
+    void DrawDot(Dot dot)
+    {
+        DrawDot((float)dot.x, (float)dot.y, dot.Index);
+    }
 }
 
 internal class Dot
 {
-    public float x, y;
+    public double x, y;
     int index;
     public int Index
     {
@@ -172,159 +196,95 @@ internal class Network
     public int numberOfSavedWantedChanges = 0;
     int[] numberOfNodesPerLayer;
     public Layer[] layers;
-    public Layer[,] wantedChangesForNumberOfExamples;
+    //public Layer[,] wantedChangesForNumberOfExamples;
     public int numberOfExamples;
-    float learningRate;
+    double learningRate;
 
-    public Network(int[] l_numberOfNodesPerLayer, int l_numberOfExamples, float l_learningRate)
+    public Network(int[] l_numberOfNodesPerLayer, double l_learningRate)
     {
         numberOfNodesPerLayer = l_numberOfNodesPerLayer;
         layers = new Layer[numberOfNodesPerLayer.Length - 1];
-        wantedChangesForNumberOfExamples = new Layer[l_numberOfExamples, numberOfNodesPerLayer.Length - 1];
+        //wantedChangesForNumberOfExamples = new Layer[l_numberOfExamples, numberOfNodesPerLayer.Length - 1];
         for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
         {
             layers[i] = new Layer(numberOfNodesPerLayer[i], numberOfNodesPerLayer[i + 1], true);
         }
-        numberOfExamples = l_numberOfExamples;
+        //numberOfExamples = l_numberOfExamples;
         learningRate = l_learningRate;
     }
 
-    public float[] Guess(float x, float y)
+    public double[] Guess(double x, double y)
     {
         layers[0].inputNodes[0] = x;
         layers[0].inputNodes[1] = y;
-        for (int i = 0; i < numberOfNodesPerLayer.Length - 1; i++)
+        for (int i = 0; i < layers.Length; i++)
         {
             layers[i].outputNodes = MatrixOperations.Sigmoid(MatrixOperations.Add(MatrixOperations.Multiply(layers[i].inputNodes, layers[i].conections), layers[i].biases));
-            if (i != numberOfNodesPerLayer.Length - 2) layers[i + 1].inputNodes = layers[i].outputNodes;
+            if (i != layers.Length - 1) layers[i + 1].inputNodes = layers[i].outputNodes;
         }
-        return layers[numberOfNodesPerLayer.Length - 2].outputNodes;
+        return layers[layers.Length - 1].outputNodes;
     }
 
-    public float[] Guess(Dot dot)
+    public double[] Guess(Dot dot)
     {
         return Guess(dot.x, dot.y);
     }
 
     public float Cost(Dot dot)
     {
-        float[] guess = Guess(dot);
+        double[] wantedChanges = WantedChanges(dot);
         float cost = 0;
-        for (int i = 0; i < guess.Length; i++)
+        for (int i = 0; i < wantedChanges.Length; i++)
         {
-            if (i == dot.Index)
-            {
-                cost += (float)Math.Pow((1 - guess[i]), 2);
-                continue;
-            }
-            cost += (float)Math.Pow(guess[i], 2);
+            cost += (float)Math.Pow(wantedChanges[i], 2);
         }
         return cost;
     }
 
-    public void BackPropagation(float[] wantedChanges, int layerIndex)
+    public void BackPropagation(double[] wantedChanges, int layerIndex)
     {
-        layerIndex--;
-        Layer wantedChangesToPreviousLayer = new Layer(layers[layerIndex].inputNodes.Length, layers[layerIndex].outputNodes.Length, false);
-        wantedChangesToPreviousLayer.outputNodes = wantedChanges;
+        Layer currentLayer = layers[layerIndex];
+        double[] wantedChangesToPreviousLayer = new double[currentLayer.inputNodes.Length];
+
+        //wantedChangesToPreviousLayer = wantedChanges;
         for (int i = 0; i < layers[layerIndex].outputNodes.Length; i++)
         {
-            float dfds = (float)Mathf.Exp(layers[layerIndex].outputNodes[i]) / (float)Math.Pow(1 + Mathf.Exp(layers[layerIndex].outputNodes[i]), 2);
+            double sigmoid = MatrixOperations.Sigmoid(layers[layerIndex].outputNodes[i]);
+            double dfds = sigmoid * (1 - sigmoid);
 
-            //wantedChangesToPreviousLayer.biases[i] = wantedChanges[i] * dfds;
             layers[layerIndex].biases[i] -= wantedChanges[i] * dfds * learningRate;
             for (int j = 0; j < layers[layerIndex].inputNodes.Length; j++)
             {
-                //wantedChangesToPreviousLayer.conections[i, j] = wantedChanges[i] * dfds / layers[layerIndex].inputNodes[j];
-                wantedChangesToPreviousLayer.inputNodes[j] += wantedChanges[i] * dfds * layers[layerIndex].conections[i, j];
-
                 layers[layerIndex].conections[i, j] -= wantedChanges[i] * dfds * layers[layerIndex].inputNodes[j] * learningRate;
+
+                wantedChangesToPreviousLayer[j] += wantedChanges[i] * dfds * layers[layerIndex].conections[i, j];
             }
         }
-        if(layerIndex != 0) BackPropagation(wantedChangesToPreviousLayer.inputNodes, layerIndex);
-        //wantedChangesForNumberOfExamples[numberOfSavedWantedChanges, layerIndex] = wantedChangesToPreviousLayer;
-        //if(layerIndex == layers.Length - 1) numberOfSavedWantedChanges = (numberOfSavedWantedChanges + 1) % numberOfExamples;
-        //if(numberOfSavedWantedChanges == 0 && layerIndex == layers.Length - 1)
-        //{
-        //    UpdateAI();
-        //}
+        if(layerIndex > 0) BackPropagation(wantedChangesToPreviousLayer, layerIndex - 1);
     }
 
-    public float[] WantedChanges(int indexOfCorrect)
+    public double[] WantedChanges(Dot dot)
     {
-        float[] wantedChanges = layers[numberOfNodesPerLayer.Length - 2].outputNodes;
-        wantedChanges[indexOfCorrect] = 1 - layers[numberOfNodesPerLayer.Length - 2].outputNodes[indexOfCorrect];
+        double[] wantedChanges = Guess(dot);
+        wantedChanges[dot.Index] = wantedChanges[dot.Index] - 1;
+
         return wantedChanges;
     }
-
-    //private void UpdateAI(float cost)
-    //{
-    //    Vector2Int locationOfMax = new Vector2Int(-2, -2);
-    //    float valueOfMaximum = float.NegativeInfinity;
-    //    Vector2Int temp = new Vector2Int(-2, -2);
-    //    int indexOfCurrentLayer = -1;
-    //    for (int i = 0; i < numberOfExamples; i++)
-    //    {
-    //        valueOfMaximum = float.NegativeInfinity;
-    //        for (int j = 0; j < layers.Length; j++)
-    //        {
-    //            //Debug.Log($"i: {i}, j: {j}");
-    //            temp = LocationOfMaximumInLayer(wantedChangesForNumberOfExamples[i, j]);
-    //            if(valueOfMaximum < Math.Abs(temp.y == -1 ? wantedChangesForNumberOfExamples[i, j].biases[temp.x] : wantedChangesForNumberOfExamples[i, j].conections[temp.x, temp.y]))
-    //            {
-    //                locationOfMax = temp;
-    //                valueOfMaximum = Math.Abs(temp.y == -1 ? wantedChangesForNumberOfExamples[i, j].biases[temp.x] : wantedChangesForNumberOfExamples[i, j].conections[temp.x, temp.y]);
-    //                indexOfCurrentLayer = j;
-    //            }
-    //        }
-
-    //        if (locationOfMax.y == -1)
-    //        {
-    //            layers[indexOfCurrentLayer].biases[locationOfMax.x] -= cost / layers[indexOfCurrentLayer].biases[locationOfMax.x];
-    //            continue;
-    //        }
-    //        //Debug.Log($"locationOfMax: {locationOfMax}, indexOfCorrectLayer: {indexOfCurrentLayer}");
-    //        layers[indexOfCurrentLayer].conections[locationOfMax.x, locationOfMax.y] -= cost / layers[indexOfCurrentLayer].conections[locationOfMax.x, locationOfMax.y];
-    //    }
-    //}
-
-    //private Vector2Int LocationOfMaximumInLayer(Layer layer)
-    //{
-    //    Vector2Int locationOfMax = new Vector2Int(0, 0);
-    //    float max = layer.conections[0, 0];
-    //    for (int i = 0; i < layer.outputNodes.Length; i++)
-    //    {
-    //        if (max < Math.Abs(layer.biases[i]))
-    //        {
-    //            locationOfMax = new Vector2Int(i, -1);
-    //            max = Math.Abs(layer.biases[i]);
-    //        }
-    //        for (int j = 0; j < layer.inputNodes.Length; j++)
-    //        {
-    //            if (max < Math.Abs(layer.conections[i, j]))
-    //            {
-    //                locationOfMax = new Vector2Int(i, j);
-    //                max = Math.Abs(layer.conections[i, j]);
-    //            }
-    //        }
-    //    }
-    //    return locationOfMax;
-    //}
 }
 
 internal class Layer
 {
-    public float[] inputNodes;
-    public float[] outputNodes;
-    public float[,] conections;
-    public float[] biases;
+    public double[] inputNodes;
+    public double[] outputNodes;
+    public double[,] conections;
+    public double[] biases;
 
     public Layer(int numberOfInputNodes, int numberOfOutputNodes, bool randomize)
     {
-        inputNodes = new float[numberOfInputNodes];
-        conections = new float[numberOfOutputNodes, numberOfInputNodes];
-        outputNodes = new float[numberOfOutputNodes];
-        biases = new float[numberOfOutputNodes];
+        inputNodes = new double[numberOfInputNodes];
+        conections = new double[numberOfOutputNodes, numberOfInputNodes];
+        outputNodes = new double[numberOfOutputNodes];
+        biases = new double[numberOfOutputNodes];
         if (randomize) FillConnections();
     }
 
@@ -342,13 +302,13 @@ internal class Layer
 
 public class MatrixOperations
 {
-    public static float[] Multiply(float[] vector, float[,] matrix)
+    public static double[] Multiply(double[] vector, double[,] matrix)
     {
         if (matrix.GetLength(1) != vector.Length) return null;
-        float[] result = new float[matrix.GetLength(0)];
+        double[] result = new double[matrix.GetLength(0)];
         for (int i = 0; i < matrix.GetLength(0); i++)
         {
-            float currentResult = 0;
+            double currentResult = 0;
             for (int j = 0; j < matrix.GetLength(1); j++)
             {
                 currentResult += matrix[i, j] * vector[j];
@@ -358,13 +318,13 @@ public class MatrixOperations
         return result;
     }
 
-    public static float[] Add(float[] v1, float[] v2)
+    public static double[] Add(double[] v1, double[] v2)
     {
         if(v1.Length != v2.Length)
         {
             return null;
         }
-        float[] result = new float[v1.Length];
+        double[] result = new double[v1.Length];
 
         for (int i = 0; i < v1.Length; i++)
         {
@@ -373,9 +333,9 @@ public class MatrixOperations
         return result;
     }
 
-    public static float[] Sigmoid(float[] v)
+    public static double[] Sigmoid(double[] v)
     {
-        float[] result = new float[v.Length];
+        double[] result = new double[v.Length];
 
         for (int i = 0; i < v.Length; i++)
         {
@@ -384,8 +344,19 @@ public class MatrixOperations
         return result;
     }
 
-    public static float Sigmoid(float input)
+    public static double Sigmoid(double input)
     {
-        return (float)(1 / (1 + Math.Pow(Math.E, -input)));
+        return 1 / (1 + Math.Pow(Math.E, -input));
+    }
+
+    public static string ToString(double[] d)
+    {
+        string dAsString = "";
+        for (int i = 0; i < d.Length; i++)
+        {
+            dAsString = $"{dAsString}, {d[i]}";
+        }
+        dAsString = dAsString.Substring(2);
+        return dAsString;
     }
 }
