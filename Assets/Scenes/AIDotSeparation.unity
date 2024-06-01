@@ -297,7 +297,7 @@ MonoBehaviour:
   inputY: {fileID: 1116013963}
   inputValue: {fileID: 2094839992}
   circleSprite: {fileID: 4005122256850821182, guid: d6e4ab3f813cef84c911d7066d374b39, type: 3}
-  learnRate: 0.1
+  learnRate: 10
   numberOfTrainigExamples: 100
 --- !u!1 &347907439
 GameObject:
@@ -550,7 +550,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b15e77919f29f27458b68e6fe82d1173, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  panel: {fileID: 0}
 --- !u!1 &538820736
 GameObject:
   m_ObjectHideFlags: 0

@@ -60,6 +60,11 @@ public class DotSeparationAI : MonoBehaviour
 
         for (int temp = 0; temp < 1000; temp++)
         {
+            if (finished)
+            {
+                Debug.Log("finished");
+                break;
+            }
             float sum = 0;
             for (int i = 0; i < numberOfTrainigExamples; i++)
             {
@@ -67,12 +72,12 @@ public class DotSeparationAI : MonoBehaviour
                 AI.BackPropagation(AI.WantedChanges(dots[i]), AI.layers.Length - 1);
                 sum += AI.Cost(dots[i]);
             }
+            Debug.Log(sum);
             if(sum < lastSum)
             {
                 continue;
             }
             finished = true;
-            Debug.Log(sum);
         }
 
         wantedChanges = AI.WantedChanges(dots[0]);
@@ -94,6 +99,26 @@ public class DotSeparationAI : MonoBehaviour
             double[] guess = AI.Guess(mouseScreenPosition.x, mouseScreenPosition.y);
             int index = Array.IndexOf(guess, guess.Max());
             output.GetComponent<SpriteRenderer>().color = new Color(index == 0 ? 1 : 0, index == 1 ? 1 : 0, index == 2 ? 1 : 0);
+        }
+
+        if (Input.GetMouseButtonDown(1))
+        {
+            for (int temp = 0; temp < 1000; temp++)
+            {
+                float sum = 0;
+                for (int i = 0; i < numberOfTrainigExamples; i++)
+                {
+                    DrawDot(dots[i]);
+                    AI.BackPropagation(AI.WantedChanges(dots[i]), AI.layers.Length - 1);
+                    sum += AI.Cost(dots[i]);
+                }
+                Debug.Log(sum);
+                if (sum < lastSum)
+                {
+                    continue;
+                }
+                finished = true;
+            }
         }
     }
     void AddDots(int number)
