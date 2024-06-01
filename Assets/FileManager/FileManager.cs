@@ -6,10 +6,10 @@ using UnityEngine.UI;
 using System.IO;
 using System.Linq;
 using System.Globalization;
+using System;
 
 public class FileManager : MonoBehaviour
 {
-    [SerializeField] Transform panel;
 
     private void Start()
     {
@@ -23,11 +23,13 @@ public class FileManager : MonoBehaviour
 
         for (int i = 0; i < path.Length; i++)
         {
-            fullPath = Path.Combine(fullPath, path[i]);
+            fullPath = $"{fullPath}/{path[i]}";
         }
 
         if (!File.Exists(fullPath))
-            return null;
+        {
+            throw new DirectoryNotFoundException();
+        }
 
         StreamReader streamReader = new StreamReader(fullPath);
         string data = streamReader.ReadToEnd();

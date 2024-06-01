@@ -16,6 +16,8 @@ public class DotSeparationAI : MonoBehaviour
     List<Dot> dots = new List<Dot>();
     string fileLocation = "dots.csv";
     Network AI;
+    bool finished = false;
+    float lastSum = float.PositiveInfinity;
 
     [Header("References")]
 
@@ -43,6 +45,13 @@ public class DotSeparationAI : MonoBehaviour
         transform.localScale = new Vector3(Mathf.Abs(Position00.position.x - Position22.position.x), Mathf.Abs(Position00.position.y - Position22.position.y), 1);
         AI = new Network(new int[] { 2, 3 }, learnRate);
 
+        AddDots(500);
+        
+        if(dots.Count < numberOfTrainigExamples)
+        {
+            throw new Exception("Not enough dots in file");
+        }
+
         double[] wantedChanges = AI.WantedChanges(dots[0]);
         double[] guess = AI.Guess(dots[0]);
 
@@ -51,12 +60,19 @@ public class DotSeparationAI : MonoBehaviour
 
         for (int temp = 0; temp < 1000; temp++)
         {
+            float sum = 0;
             for (int i = 0; i < numberOfTrainigExamples; i++)
             {
                 DrawDot(dots[i]);
                 AI.BackPropagation(AI.WantedChanges(dots[i]), AI.layers.Length - 1);
-                //wantedChanges = AI.WantedChanges(dots[i]);
+                sum += AI.Cost(dots[i]);
             }
+            if(sum < lastSum)
+            {
+                continue;
+            }
+            finished = true;
+            Debug.Log(sum);
         }
 
         wantedChanges = AI.WantedChanges(dots[0]);
@@ -90,19 +106,19 @@ public class DotSeparationAI : MonoBehaviour
         {
             x = UnityEngine.Random.value * 2;
             y = UnityEngine.Random.value * 2;
-            if (2 * x + y - 1.5 < 0)
+            if (y < (2.0 / 3.0) * x)
             {
                 index = 0;
                 AddDot(x, y, index);
                 continue;
             }
-            if (2.5 * x + y - 3 < 0)
+            if (y < (3.0 / 2.0) * x)
             {
-                index = 2;
+                index = 1;
                 AddDot(x, y, index);
                 continue;
             }
-            index = 1;
+            index = 2;
             AddDot(x, y, index);
             continue;
         }
@@ -120,7 +136,7 @@ public class DotSeparationAI : MonoBehaviour
     {
         Dot addedDot = new Dot(x, y, index);
         dots.Add(addedDot);
-        FindObjectOfType<FileManager>().Append(addedDot.ToString(), fileLocation);
+        //FindObjectOfType<FileManager>().Append(addedDot.ToString(), fileLocation);
         DrawDot(x, y, index);
     }
 
