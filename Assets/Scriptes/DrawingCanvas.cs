@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,6 +15,8 @@ public class DrawingCanvas : MonoBehaviour
     Vector3 mousePos;
     float[,] pixels;
     int dimension = 32;
+    Network AI;
+    string lookingAtDigit;
 
     [Header("References")]
 
@@ -26,7 +29,13 @@ public class DrawingCanvas : MonoBehaviour
     [SerializeField] Text text;
     [SerializeField] Text loadedFromRandom;
 
-    [Header("Crtanje")]
+    [Header("AI")]
+    [SerializeField] double learningRate;
+    [SerializeField] string numberOfNodesPerLayer;
+    [SerializeField] int numberOfTrainingExamples;
+    [SerializeField] int numberOfRepetition;
+
+    [Header("Drawing")]
 
     [SerializeField] float innerRadius;
     [SerializeField] float scale;
@@ -40,7 +49,29 @@ public class DrawingCanvas : MonoBehaviour
         ReadRadius();
         ReadStrength();
         pixels = new float[dimension, dimension];
+        for (int i = 0; i < digit.options.Count; i++)
+        {
+            if (!Directory.Exists(Path.Combine(Application.persistentDataPath, digit.options[i].text)))
+            {
+                Directory.CreateDirectory(Path.Combine(Application.persistentDataPath, digit.options[i].text));
+            }
+        }
+        Train();
     }
+
+    public void Train()
+    {
+        AI = new Network(Network.FormatNumberOfNodes(numberOfNodesPerLayer), learningRate);
+        for (int i = 0; i < numberOfRepetition; i++)
+        {
+            for (int j = 0; j < numberOfTrainingExamples; j++)
+            {
+                LoadRandomPicture();
+                AI.Learn(MatrixOperations.Array2DToArray1D(pixels), digit.options.FindIndex(x => x.text == lookingAtDigit));
+            }
+        }
+    }
+
 
     [ContextMenu("Create canvas")]
     void CreateCanvas()
@@ -72,6 +103,14 @@ public class DrawingCanvas : MonoBehaviour
                 temp.name = $"pixel{j}";
             }
         }
+    }
+
+    public void Guess()
+    {
+        double[] guess = AI.Guess(MatrixOperations.Array2DToArray1D(pixels));
+        int guessIndex = Array.IndexOf(guess, guess.Max());
+        Debug.Log(guessIndex < 10 ? guessIndex : "Nista");
+        loadedFromRandom.text = guessIndex < 10 ? guessIndex.ToString() : "Nista";
     }
 
     float Strength(float d)
@@ -201,6 +240,13 @@ public class DrawingCanvas : MonoBehaviour
 
     void LoadPicture()
     {
+        //for (int i = 0; i < transform.childCount; i++)
+        //{
+        //    Debug.Log(transform.GetChild(i).name);
+        //}
+
+        Debug.Log(transform.childCount);
+
         for (int i = 0; i < transform.childCount; i++)
         {
             for (int j = 0; j < transform.GetChild(i).childCount; j++)
@@ -215,19 +261,20 @@ public class DrawingCanvas : MonoBehaviour
         int numberOfDigits = digit.options.Count;
         bool[] hasFile = new bool[numberOfDigits];
         int randomNumber;
-        string lookingAtDigit;
+        string l_lookingAtDigit;
         do
         {
-            randomNumber = Random.Range(0, numberOfDigits);
-            lookingAtDigit = digit.options[randomNumber].text;
+            randomNumber = UnityEngine.Random.Range(0, numberOfDigits);
+            l_lookingAtDigit = digit.options[randomNumber].text;
             hasFile[randomNumber] = true;
 
-        } while (Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length == 0 && hasFile.Any(c => c == false));
+        } while (Directory.GetFiles(Path.Combine(Application.persistentDataPath, l_lookingAtDigit)).Length == 0 && hasFile.Any(c => c == false));
 
-        int numberOfExamples = Directory.GetFiles(Path.Combine(Application.persistentDataPath, lookingAtDigit)).Length;
-        randomNumber = Random.Range(0, numberOfExamples);
-        Load($"{lookingAtDigit}/{randomNumber}.txt");
-        loadedFromRandom.text = lookingAtDigit;
+        int numberOfExamples = Directory.GetFiles(Path.Combine(Application.persistentDataPath, l_lookingAtDigit)).Length;
+        randomNumber = UnityEngine.Random.Range(0, numberOfExamples);
+        Load($"{l_lookingAtDigit}/{randomNumber}.txt");
+        loadedFromRandom.text = l_lookingAtDigit;
+        lookingAtDigit = l_lookingAtDigit;
     }
 
     public void ReadRadius()
